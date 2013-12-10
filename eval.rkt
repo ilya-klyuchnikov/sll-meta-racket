@@ -39,10 +39,8 @@
       [(gcall? expr)
        (let* ([arg (first (gcall-args expr))]
               [args (rest (gcall-args expr))]
-              [inner-step (step arg)]
-              [expr1 (step-transient-expr inner-step)]
-              [info (step-transient-info inner-step)])
-         (step-transient info (gcall (cons expr1 args))))]
+              [inner-step (step arg)])
+         (map-result (λ (e) (gcall (gcall-name expr) (cons e args))) inner-step))]
       [else (error "eval-stepper/step incorrect expression found:" expr)]))
   step)
 
