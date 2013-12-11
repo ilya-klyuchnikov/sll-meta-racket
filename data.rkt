@@ -137,3 +137,33 @@
 ; (id-subst (g-call 'x (Nil) 'z 'x)) => (('x . (var 'x)) ('z (var 'z)))
 (define (id-subst e)
   (map (λ (n) (cons n (var n))) (vnames e)))
+
+; renaming is a map from names to names
+; returns either #f (if no renaming) or renaming
+
+; returns a list of optional elementary renamings
+(define (ren e1 e2)
+  (cond
+    [(and (var? e1) (var? e2))
+     (list (cons (var-name e1) (var-name e2)))]
+    [(and (ctr? e1) (ctr? e2) (equal? (ctr-name e1) (ctr-name e2)))
+     (apply append (map ren (ctr-args e1) (ctr-args e2)))]
+    [(and (fcall? e1) (fcall? e2) (equal? (fcall-name e1) (fcall-name e2)))
+     (apply append (map ren (fcall-args e1) (fcall-args e2)))]
+    [(and (gcall? e1) (gcall? e2) (equal? (gcall-name e1) (gcall-name e2)))
+     (apply append (map ren (fcall-args e1) (fcall-args e2)))]
+    [else (list #f)]))
+
+(define (zip l1 l2)
+  (cond
+    [(or (empty? l1) (empty? l2)) '()]
+    [else (cons (cons (first l1) (first l2))
+                (zip (rest l1) (rest l2)))]))
+
+; Here is a simple trick.
+; If there is a renaming, then it will be
+; (zip (vnames e1) (vnames e2))
+(define (renaming e1 e2)
+  (let ([res (remove-duplicates (ren e1 e2))]
+        [expected-ren (zip (vnames e1) (vnames e2))])
+        (and (equal? res expected-ren) expected-ren)))

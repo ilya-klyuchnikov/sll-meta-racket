@@ -8,10 +8,15 @@
          "ura.rkt"
          rackunit)
 
+(define (s-renaming se1 se2)
+  (renaming (parse-expr se1) (parse-expr se2)))
+
 ; all tests are done wrt this tiny program
 (define s-prog
   '[
     {(f-main xs ys) = (g-append xs ys)}
+    {(g-flatten (Leaf x)) = (Cons x (Nil))}
+    {(g-flatten (Node lt x rt)) = (g-append (g-flatten lt) (Cons x (g-flatten rt)) )}
     ; list concatenation
     {(g-append (Nil) ys) = ys}
     {(g-append (Cons x xs) ys) = (Cons x (g-append xs ys))}
@@ -60,6 +65,25 @@
   (let ([res (run-ura n prog (parse-expr s-in) (parse-expr s-out))])
     (map (λ (sub) (map-values unparse-expr sub)) res)))
 
+;;;;;;;;;;;;;;;;;;;;
+;;   Renaming     ;;
+;;;;;;;;;;;;;;;;;;;;
+
+(check-equal?
+ (s-renaming '(A) '(A))
+ '())
+
+(check-equal?
+ (s-renaming '(A) '(B))
+ #f)
+
+(check-equal?
+ (s-renaming '(P x y) '(P y x))
+ '((x . y) (y . x)))
+
+(check-equal?
+ (s-renaming '(P x x) '(P y x))
+ #f)
 
 ;;;;;;;;;;;;;;;;;;;;
 ;;   Eval tests   ;;
@@ -200,7 +224,7 @@
 ; checks that ura loops for this example
 (check-exn
  exn:fail?
- (λ () (with-limits 4 100 (s-ura* '(g-zero x (T)) '(T))))
+ (λ () (with-limits 1 50 (s-ura* '(g-zero x (T)) '(T))))
  "should loop")
 
 ; however, we can output the first result
@@ -209,3 +233,9 @@
  '{
    [(x . (Zero))]
    })
+
+; checks that ura loops for this example
+(check-exn
+ exn:fail?
+ (λ () (with-limits 1 50 (s-ura 1 '(g-eq-list (g-flatten x) (Nil)) '(T))))
+ "should loop")
