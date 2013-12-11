@@ -46,7 +46,7 @@
 
 (define (build-eval-tree prog expr)
   (define stepper (eval-stepper prog))
-  (define (aux expr)
+  (define (build expr)
     (let ([step (stepper expr)])
       (cond
         [(step-stop? step)
@@ -54,14 +54,15 @@
         [(step-transient? step)
          (node expr (edge-transient
                      (step-transient-info step)
-                     (aux (step-transient-expr step))))]
+                     (build (step-transient-expr step))))]
         [(step-decompose? step)
          (node expr (edge-decompose
                      (step-decompose-name step)
-                     (map aux (step-decompose-exprs step))))]
-        [else (error "build-eval-tree/aux unknown step:" step)])))
-  (aux expr))
+                     (map build (step-decompose-exprs step))))]
+        [else (error "build-eval-tree/build unknown step:" step)])))
+  (build expr))
 
+; constructs a result of evaluation given an evaluation tree
 (define (eval-tree tree)
   (cond
     [(leaf? tree)
