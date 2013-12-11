@@ -1,8 +1,9 @@
-#lang racket
+#lang lazy
 
 (require "data.rkt" "process-tree.rkt")
-(provide ura)
+(provide (all-defined-out))
 
+;; lazy stream of results
 (define (ura prog in out)
   (define tree (build-process-tree prog in))
   (define (traverse queue)
@@ -29,3 +30,9 @@
                  [else (error "ura/traverse unknown edge" edge)]))]
             [else (error "ura/traverse unknown node" t)]))))
   (traverse (list (cons (id-subst in) tree))))
+
+(define (run-ura* prog in out)
+  (!! (ura prog in out)))
+
+(define (run-ura n prog in out)
+  (!! (take n (ura prog in out))))

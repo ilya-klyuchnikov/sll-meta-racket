@@ -1,6 +1,12 @@
 #lang racket
 
-(require "data.rkt" "parse.rkt" "eval.rkt" "meta-step.rkt" "process-tree.rkt" "ura.rkt" rackunit)
+(require "data.rkt"
+         "parse.rkt"
+         "eval.rkt"
+         "meta-step.rkt"
+         "process-tree.rkt"
+         "ura.rkt"
+         rackunit)
 
 ; all tests are done wrt this tiny program
 (define s-prog
@@ -32,6 +38,9 @@
     ; dummy function - just to enforce pattern matching
     {(g-b (F) x) = x}
     {(g-b (T) x) = x}
+    ; idle function for tests
+    {(g-zero (Zero) x) = x}
+    {(g-zero (Succ n) x) = (g-zero n (F))}
     ])
 
 (define prog
@@ -43,14 +52,14 @@
 (define (s-eval s-expr)
   (unparse-expr (eval-tree (s-eval-tree s-expr))))
 
-(define (s-ura-0 s-in s-out)
-  (let ([res (ura prog (parse-expr s-in) (parse-expr s-out))])
-    res))
-
-
-(define (s-ura s-in s-out)
-  (let ([res (ura prog (parse-expr s-in) (parse-expr s-out))])
+(define (s-ura* s-in s-out)
+  (let ([res (run-ura* prog (parse-expr s-in) (parse-expr s-out))])
     (map (λ (sub) (map-values unparse-expr sub)) res)))
+
+(define (s-ura n s-in s-out)
+  (let ([res (run-ura n prog (parse-expr s-in) (parse-expr s-out))])
+    (map (λ (sub) (map-values unparse-expr sub)) res)))
+
 
 ;;;;;;;;;;;;;;;;;;;;
 ;;   Eval tests   ;;
@@ -87,56 +96,56 @@
 
 ; no solution
 (check-equal?
- (s-ura '(g-eq (A) (A)) '(F))
+ (s-ura* '(g-eq (A) (A)) '(F))
  (list))
 
 ; one solution - empty subst
 (check-equal?
- (s-ura '(g-eq (A) (A)) '(T))
+ (s-ura* '(g-eq (A) (A)) '(T))
  '{
    []
    })
 
 (check-equal?
- (s-ura '(g-eq x (A)) '(T))
+ (s-ura* '(g-eq x (A)) '(T))
  '{
    [(x . (A))]
    })
 
 (check-equal?
- (s-ura '(g-eq (A) x) '(T))
+ (s-ura* '(g-eq (A) x) '(T))
  '{
    [(x . (A))]
    })
 
 (check-equal?
- (s-ura '(g-eq x x) '(T))
+ (s-ura* '(g-eq x x) '(T))
  '{
    [(x . (A))]
    [(x . (B))]
    })
 
 (check-equal?
- (s-ura '(g-eq x x) '(F))
+ (s-ura* '(g-eq x x) '(F))
  '{
    })
 
 (check-equal?
- (s-ura '(g-eq x y) '(T))
+ (s-ura* '(g-eq x y) '(T))
  '{
    [(x . (A))  (y . (A))]
    [(x . (B))  (y . (B))]
    })
 
 (check-equal?
- (s-ura '(g-eq x y) '(F))
+ (s-ura* '(g-eq x y) '(F))
  '{
    [(x . (A))  (y . (B))]
    [(x . (B))  (y . (A))]
    })
 
 (check-equal?
- (s-ura '(g-&& (g-eq x y) (g-eq x z)) '(T))
+ (s-ura* '(g-&& (g-eq x y) (g-eq x z)) '(T))
  '{
    [(x . (A))  (y . (A))  (z . (A))]
    [(x . (B))  (y . (B))  (z . (B))]
@@ -145,7 +154,7 @@
 ; this shows some asymmetry of URA wrt relations
 ; when relation function doesn't consider all cases (using else, otherwise, ...)
 (check-equal?
- (s-ura '(g-&& (g-eq x y) (g-eq x z)) '(F))
+ (s-ura* '(g-&& (g-eq x y) (g-eq x z)) '(F))
  '{
    [(x . (A))  (y . (B))  (z . z)]
    [(x . (B))  (y . (A))  (z . z)]
@@ -155,7 +164,7 @@
 
 ; this answer is more detailed since "testing" function & is more detailed
 (check-equal?
- (s-ura '(g-& (g-eq x y) (g-eq x z)) '(F))
+ (s-ura* '(g-& (g-eq x y) (g-eq x z)) '(F))
  '{
    [(x . (A))  (y . (B))  (z . (A))]
    [(x . (A))  (y . (B))  (z . (B))]
@@ -166,13 +175,13 @@
    })
 
 (check-equal?
- (s-ura '(g-eq-list (g-append x y) (Nil)) '(T))
+ (s-ura* '(g-eq-list (g-append x y) (Nil)) '(T))
  '{
    [(x . (Nil))  (y . (Nil))]
    })
 
 (check-equal?
- (s-ura '(g-eq-list (g-append x y) (Cons (A) (Nil))) '(T))
+ (s-ura* '(g-eq-list (g-append x y) (Cons (A) (Nil))) '(T))
  '{
    [(x . (Nil))  (y . (Cons (A) (Nil)))]
    [(x . (Cons (A) (Nil)))  (y . (Nil))]
@@ -180,8 +189,23 @@
 
 ; this example shows that the form how relation is coded matters
 (check-equal?
- (s-ura '(g-eq-list (g-append x y) (Nil)) '(F))
+ (s-ura* '(g-eq-list (g-append x y) (Nil)) '(F))
  '{
    [(x . (Nil))  (y . (Cons y.1 y.2))]
    [(x . (Cons x.1 x.2))  (y . y)]
+   })
+
+(require racket/sandbox)
+
+; checks that ura loops for this example
+(check-exn
+ exn:fail?
+ (λ () (with-limits 4 100 (s-ura* '(g-zero x (T)) '(T))))
+ "should loop")
+
+; however, we can output the first result
+(check-equal?
+ (s-ura 1 '(g-zero x (T)) '(T))
+ '{
+   [(x . (Zero))]
    })

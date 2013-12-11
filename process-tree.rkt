@@ -1,4 +1,4 @@
-#lang racket
+#lang lazy
 
 (require "data.rkt" "meta-step.rkt")
 (provide (all-defined-out))
