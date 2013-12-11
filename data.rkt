@@ -151,7 +151,7 @@
     [(and (fcall? e1) (fcall? e2) (equal? (fcall-name e1) (fcall-name e2)))
      (apply append (map ren (fcall-args e1) (fcall-args e2)))]
     [(and (gcall? e1) (gcall? e2) (equal? (gcall-name e1) (gcall-name e2)))
-     (apply append (map ren (fcall-args e1) (fcall-args e2)))]
+     (apply append (map ren (gcall-args e1) (gcall-args e2)))]
     [else (list #f)]))
 
 (define (zip l1 l2)
@@ -167,3 +167,15 @@
   (let ([res (remove-duplicates (ren e1 e2))]
         [expected-ren (zip (vnames e1) (vnames e2))])
         (and (equal? res expected-ren) expected-ren)))
+
+(define (prefix? path1 path2)
+  (cond
+    [(> (length path1) (length path2))
+     #f]
+    [(= (length path1) (length path2))
+     (equal? path1 path2)]
+    [else
+     (prefix? path1 (rest path2))]))
+
+(define (map-with-index f xs)
+  (map f xs (range (length xs))))
