@@ -32,7 +32,7 @@
         [(step-decompose? step)
          (process-node id expr (process-edge-decompose
                                 (step-decompose-name step)
-                                (map-with-index (λ (e i) (build e (cons i id))) 
+                                (map-with-index (λ (e i) (build e (cons i id)))
                                                 (step-decompose-exprs step))))]
         [else (error "build-eval-tree/build unknown step:" step)])))
   (build expr '()))
